@@ -16,17 +16,18 @@ class ImageRecognizer:
         x = preprocess_input(x)
         preds = self.model.predict(x)
         return decode_predictions(preds, top=3)[0]
-from transformers import GPT2LMHeadModel, GPT2Tokenizer
+from transformers import TFGPT2LMHeadModel, GPT2Tokenizer
 
 class ChatBot:
     def __init__(self):
         self.tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
-        self.model = GPT2LMHeadModel.from_pretrained("gpt2")
+        self.model = TFGPT2LMHeadModel.from_pretrained("gpt2")
 
     def respond(self, text):
-        inputs = self.tokenizer.encode(text, return_tensors="pt")
+        inputs = self.tokenizer.encode(text, return_tensors="tf")
         outputs = self.model.generate(inputs, max_length=50, num_return_sequences=1)
         return self.tokenizer.decode(outputs[0], skip_special_tokens=True)
+
 import streamlit as st
 from PIL import Image
 
