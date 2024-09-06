@@ -7,8 +7,8 @@ from transformers import pipeline
 # Load the image classification model
 model = tf.keras.applications.MobileNetV2(weights='imagenet')
 
-# Load the NLP model for conversational responses
-nlp_model = pipeline('conversational')
+# Load the text generation model
+text_generator = pipeline('text-generation', model='gpt2')
 
 # Define a function to preprocess the image
 def preprocess_image(image):
@@ -27,8 +27,8 @@ def predict_image(image):
 # Define a function to handle the conversational response
 def get_conversational_response(image_description, user_query):
     conversation_input = f"The image contains {image_description}. User query: {user_query}"
-    conversation = nlp_model(conversation_input)
-    return conversation['generated_text']
+    response = text_generator(conversation_input, max_length=100)[0]['generated_text']
+    return response
 
 # Streamlit app
 def main():
@@ -54,4 +54,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
