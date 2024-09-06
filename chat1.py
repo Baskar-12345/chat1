@@ -8,7 +8,7 @@ from transformers import pipeline
 model = tf.keras.applications.MobileNetV2(weights='imagenet')
 
 # Load the text generation model
-text_generator = pipeline('text-generation', model='gpt2')
+text_generator = pipeline('text-generation', model='distilgpt2')
 
 # Define a function to preprocess the image
 def preprocess_image(image):
