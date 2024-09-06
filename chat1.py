@@ -1,64 +1,57 @@
-import tensorflow as tf
-from tensorflow.keras.applications import MobileNetV2 # type: ignore
-from tensorflow.keras.preprocessing import image # type: ignore
-from tensorflow.keras.applications.mobilenet_v2 import preprocess_input, decode_predictions # type: ignore
-
-import numpy as np
-
-class ImageRecognizer:
-    def __init__(self):
-        self.model = MobileNetV2(weights='imagenet')
-
-    def recognize(self, img_path):
-        img = image.load_img(img_path, target_size=(224, 224))
-        x = image.img_to_array(img)
-        x = np.expand_dims(x, axis=0)
-        x = preprocess_input(x)
-        preds = self.model.predict(x)
-        return decode_predictions(preds, top=3)[0]
-from transformers import TFGPT2LMHeadModel, GPT2Tokenizer
-
-class ChatBot:
-    def __init__(self):
-        self.tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
-        self.model = TFGPT2LMHeadModel.from_pretrained("gpt2")
-
-    def respond(self, text):
-        inputs = self.tokenizer.encode(text, return_tensors="tf")
-        outputs = self.model.generate(inputs, max_length=50, num_return_sequences=1)
-        return self.tokenizer.decode(outputs[0], skip_special_tokens=True)
-
 import streamlit as st
 from PIL import Image
+import numpy as np
+import tensorflow as tf
+from transformers import pipeline
 
+# Load the image classification model
+model = tf.keras.applications.MobileNetV2(weights='imagenet')
+
+# Load the NLP model for conversational responses
+nlp_model = pipeline('conversational')
+
+# Define a function to preprocess the image
+def preprocess_image(image):
+    image = image.resize((224, 224))
+    image_array = np.array(image)
+    image_array = tf.keras.applications.mobilenet_v2.preprocess_input(image_array)
+    return np.expand_dims(image_array, axis=0)
+
+# Define a function to get image predictions
+def predict_image(image):
+    preprocessed_image = preprocess_image(image)
+    predictions = model.predict(preprocessed_image)
+    decoded_predictions = tf.keras.applications.mobilenet_v2.decode_predictions(predictions, top=1)[0]
+    return decoded_predictions[0][1]
+
+# Define a function to handle the conversational response
+def get_conversational_response(image_description, user_query):
+    conversation_input = f"The image contains {image_description}. User query: {user_query}"
+    conversation = nlp_model(conversation_input)
+    return conversation['generated_text']
+
+# Streamlit app
 def main():
-    st.title("AI Chatbot with Image Recognition")
+    st.title("Conversational Image Recognition Chatbot")
 
-    st.sidebar.header("Upload an Image")
-    uploaded_file = st.sidebar.file_uploader("Choose an image...", type=["jpg", "png", "jpeg"])
+    # Upload an image
+    uploaded_image = st.file_uploader("Upload an image", type=["jpg", "jpeg", "png"])
 
-    if uploaded_file is not None:
-        # Display uploaded image
-        st.image(uploaded_file, caption="Uploaded Image", use_column_width=True)
+    if uploaded_image is not None:
+        image = Image.open(uploaded_image)
+        st.image(image, caption="Uploaded Image", use_column_width=True)
+        
+        # Get image description
+        image_description = predict_image(image)
+        st.write(f"Image Description: {image_description}")
 
-        # Save uploaded file
-        with open("temp_image.jpg", "wb") as f:
-            f.write(uploaded_file.getbuffer())
+        # User query
+        user_query = st.text_input("Ask a question about the image:")
 
-        # Recognize objects in the image
-        recognizer = ImageRecognizer()
-        predictions = recognizer.recognize("temp_image.jpg")
-        st.write("Object Detection Results:")
-        for pred in predictions:
-            st.write(f"{pred[1]}: {pred[2]*100:.2f}%")
-
-    st.sidebar.header("Chat with AI")
-    user_input = st.sidebar.text_input("You:", "")
-    
-    if user_input:
-        chatbot = ChatBot()
-        response = chatbot.respond(user_input)
-        st.sidebar.text_area("AI:", response, height=200)
+        if user_query:
+            response = get_conversational_response(image_description, user_query)
+            st.write(f"Response: {response}")
 
 if __name__ == "__main__":
     main()
+
