@@ -1,5 +1,9 @@
 streamlit
-tensorflow
+torch
+tensorflow       
 transformers
-Pillow
 numpy
+Pillow
+opencv-python-headless
+requests
+scikit-learn
