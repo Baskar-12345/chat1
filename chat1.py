@@ -1,56 +1,49 @@
 import streamlit as st
+from transformers import pipeline, BlipProcessor, BlipForConditionalGeneration
 from PIL import Image
-import numpy as np
-import tensorflow as tf
-from transformers import pipeline
+import requests
 
-# Load the image classification model
-model = tf.keras.applications.MobileNetV2(weights='imagenet')
+# Set up Streamlit app
+st.title("Conversational Image Recognition Chatbot")
+st.write("Upload an image and ask questions about it!")
 
-# Load the text generation model
-text_generator = pipeline('text-generation', model='distilgpt2')
+# Load pre-trained models
+@st.cache_resource
+def load_models():
+    # Load the object detection model (use a pre-trained model)
+    processor = BlipProcessor.from_pretrained("Salesforce/blip-vqa-base")
+    model = BlipForConditionalGeneration.from_pretrained("Salesforce/blip-vqa-base")
+    
+    # Load the NLP model for conversational responses
+    nlp = pipeline("conversational", model="microsoft/DialoGPT-medium")
+    return processor, model, nlp
 
-# Define a function to preprocess the image
-def preprocess_image(image):
-    image = image.resize((224, 224))
-    image_array = np.array(image)
-    image_array = tf.keras.applications.mobilenet_v2.preprocess_input(image_array)
-    return np.expand_dims(image_array, axis=0)
+processor, img_model, nlp_model = load_models()
 
-# Define a function to get image predictions
-def predict_image(image):
-    preprocessed_image = preprocess_image(image)
-    predictions = model.predict(preprocessed_image)
-    decoded_predictions = tf.keras.applications.mobilenet_v2.decode_predictions(predictions, top=1)[0]
-    return decoded_predictions[0][1]
+# File uploader for the image
+uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "jpeg", "png"])
 
-# Define a function to handle the conversational response
-def get_conversational_response(image_description, user_query):
-    conversation_input = f"The image contains {image_description}. User query: {user_query}"
-    response = text_generator(conversation_input, max_length=100)[0]['generated_text']
-    return response
+if uploaded_file is not None:
+    # Display the uploaded image
+    image = Image.open(uploaded_file)
+    st.image(image, caption="Uploaded Image", use_column_width=True)
 
-# Streamlit app
-def main():
-    st.title("Conversational Image Recognition Chatbot")
+    # User input for questions
+    user_question = st.text_input("Ask a question about the image:")
 
-    # Upload an image
-    uploaded_image = st.file_uploader("Upload an image", type=["jpg", "jpeg", "png"])
+    if user_question:
+        # Prepare the image and the question for the model
+        inputs = processor(images=image, text=user_question, return_tensors="pt")
 
-    if uploaded_image is not None:
-        image = Image.open(uploaded_image)
-        st.image(image, caption="Uploaded Image", use_column_width=True)
-        
-        # Get image description
-        image_description = predict_image(image)
-        st.write(f"Image Description: {image_description}")
+        # Generate a response using the image recognition model
+        output = img_model.generate(**inputs)
+        answer = processor.decode(output[0], skip_special_tokens=True)
 
-        # User query
-        user_query = st.text_input("Ask a question about the image:")
+        st.write(f"Image Recognition Response: {answer}")
 
-        if user_query:
-            response = get_conversational_response(image_description, user_query)
-            st.write(f"Response: {response}")
+        # Generate a conversational response using the NLP model
+        chat_input = f"The image recognition result is '{answer}'. User asked: {user_question}"
+        conversation = nlp_model(chat_input)
 
-if __name__ == "__main__":
-    main()
+        # Display the conversational response
+        st.write(f"Chatbot Response: {conversation[-1]['generated_text']}")
